@@ -1,0 +1,64 @@
+.main{
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 10fr 0.5fr;
+    gap: 0px 0px;
+    grid-template-areas:
+            "."
+            ".";
+}
+
+.chatBox{
+    overflow: auto;
+}
+
+.chatBoxTop{
+    height: 50px;
+}
+
+.connections{
+    position: absolute;
+    left: 25px;
+    top: 25px;
+}
+
+.botom{
+    /*height: 100%;*/
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.botom > input{
+    height: 25px;
+}
+.botom > button{
+     height: 50px;
+ }
+
+.videoBox {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    /*width: 100%;*/
+    /*height: 100%;*/
+}
+
+.videoBox > video {
+    height: 80%;
+    /*border: 1px solid black;*/
+    /*height: 800px;*/
+}
+.videoCStrimBox{
+    width: 200px;
+    height: 200px;
+    position: absolute;
+    right: 50px;
+    bottom: 200px;
+    border: 1px solid black;
+}
+.videoCStrimBox > video{
+    width: 100%;
+    height: 100%;
+}
