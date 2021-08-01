@@ -1,14 +1,22 @@
-import React, {useContext, useEffect, useRef, useState} from "react";
+import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import {useSelector} from "react-redux";
 import Peer from "simple-peer"
 import s from './global.module.css'
 import {WebSocketContext} from "../sockets/websocket";
+import getusermedia from "getusermedia";
+import {VideoStreamMerger} from "video-stream-merger";
+import {CONFIG_PEER} from "../config";
+
 
 export const Index = () => {
   const [peerC, setPeerC] = useState()
-  const [peerS] = useState()
+  const peerS = useMemo(() => new Peer({initiator: false, config: CONFIG_PEER}), [])
+  const [cam, setCam] = useState()
+  const [screen, setScreen] = useState()
   const [streamC, setStreamC] = useState()
+  const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
   const [streamS, setStreamS] = useState()
+  const [merger] = useState(new VideoStreamMerger())
   const [gotAnswer, setGotAnswer] = useState(false)
   const peerAnswer = useSelector(state => state.main.peerAnswer);
   const peerOffer = useSelector(state => state.main.peerOffer);
@@ -21,7 +29,8 @@ export const Index = () => {
   const peerCStart = (stream) => {
     const peer = new Peer({
       initiator: true,
-      stream: stream,
+      config: CONFIG_PEER,
+      stream,
     })
     setPeerC(peer)
 
@@ -39,44 +48,143 @@ export const Index = () => {
   useEffect(() => {
     if (peerAnswer.tmp) {
       setGotAnswer(true)
-      console.log(peerAnswer.tmp);
-      peerC.signal(peerAnswer.tmp)
+      // console.log(peerAnswer.tmp);
+      try {
+        peerC.signal(peerAnswer.tmp)
+      } catch (e) {
+
+      }
     }
-  }, [peerAnswer])
+  }, [peerAnswer, peerC])
 
   useEffect(() => {
     if (peerOffer.tmp) {
-      let peer = new Peer({
-        initiator: false,
-      })
-      peer.on('stream', function (stream) {
-        videoTagS.current.srcObject = stream
-        videoTagS.current.play()
-      })
-      peer.on('signal', function (data) {
-        ws.sendNewAnswer(data)
-      })
-      peer.signal(peerOffer.tmp)
+      peerS.signal(peerOffer.tmp)
     }
-  }, [peerOffer])
+  }, [peerOffer, peerS])
 
-  const stopBothVideoAndAudio = (stream) => {
-    stream.getTracks().forEach((track) => {
-      if (track.readyState === 'live') {
-        track.stop();
-      }
-    });
+  useEffect(() => {
+    if (!ws) return;
+    peerS.on('stream', (stream) => {
+      console.log('stream from server');
+      videoTagS.current.srcObject = stream
+      videoTagS.current.play()
+    })
+    peerS.on('signal', (data) => {
+      ws.sendNewAnswer(data)
+    })
+    peerS.on('close', () => {
+      setPeerC(null);
+    })
+  }, [ws, peerS])
+
+
+  const getWebCam = async () => {
+    const data = await new Promise(resolve => getusermedia({video: true, audio: true}, (err, webcamStream) => {
+      resolve(webcamStream)
+    }))
+    setCam(data)
+    return data
   }
 
-  const newStreamCamVoice = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    })
-    ws.sendNewStreamer()
-    setStreamC(stream)
+  const getScreen = async () => {
+    try {
+      const data = await navigator.mediaDevices.getDisplayMedia()
+      setScreen(data)
+      return data
+    } catch (e) {
+      return false;
+    }
+  }
 
-    peerCStart(stream)
+  const addStreamToPeer = (stream) => {
+    if (!peerC) {
+      ws.sendNewStreamer()
+      peerCStart(stream)
+    } else {
+      try {
+        peerC.addStream(stream)
+      } catch (e) {
+      }
+    }
+  }
+
+  const handleStartCamStream = async () => {
+
+    if (alreadyStream.cam) return;
+
+    if (!alreadyStream.screen) {
+      const webcamStream = await getWebCam();
+      if (!webcamStream) return;
+
+      merger.start()
+      merger.addStream(webcamStream)
+      setStreamC(merger.result)
+      addStreamToPeer(merger.result)
+      setAlreadyStream({...alreadyStream, cam: true})
+    } else {
+      await startCamAndScreen(streamC, 'screen')
+    }
+
+
+  }
+
+
+  const handleStartScreenCapture = async () => {
+    if (alreadyStream.screen) return;
+
+    if (!alreadyStream.cam) {
+      const screenStream = await getScreen();
+      if (!screenStream) return;
+      merger.start()
+      merger.addStream(screenStream)
+      setStreamC(merger.result)
+
+      addStreamToPeer(merger.result)
+      setAlreadyStream({...alreadyStream, screen: true})
+    } else {
+      await startCamAndScreen(streamC, 'cam')
+    }
+
+  }
+
+  const startCamAndScreen = async (streamRm) => {
+    let Cam, Screen
+    if (cam) Cam = cam;
+    else Cam = await getWebCam();
+    if (screen) Screen = screen;
+    else Screen = await getScreen()
+
+    if (!Cam || !Screen) return;
+
+    setAlreadyStream({cam: true, screen: true})
+
+    merger.addStream(Screen, {
+      x: 0,
+      y: 0,
+      width: merger.width,
+      height: merger.height,
+      mute: true
+    })
+
+    merger.addStream(Cam, {
+      x: merger.width - 150,
+      y: merger.height - 150,
+      width: 150,
+      height: 150,
+      mute: false
+    })
+
+    try {
+      merger.removeStream(streamRm)
+    } catch (e) {
+      console.log(e);
+    }
+
+
+    merger.start()
+    const stream = merger.result;
+    setStreamC(stream)
   }
 
 //   // stop only camera
@@ -99,37 +207,73 @@ export const Index = () => {
 
   useEffect(() => {
     if (streamC) {
-      videoTagC.current.srcObject = streamC
-      videoTagC.current.play()
+      try {
+        videoTagC.current.srcObject = streamC
+        videoTagC.current.play()
+      } catch (e) {
+
+      }
     }
   }, [streamC])
 
-  useEffect(() => {
-    if (streamC) peerS.addStream(streamS);
-  }, [streamS])
+  // useEffect(() => {
+  //   if (streamCamC) peerS.addStream(streamS);
+  // }, [streamS])
 
-  const handleStartStream = async () => {
-    await newStreamCamVoice()
-  }
 
   const handleWatchStream = async () => {
     ws.sendNewReceiver()
   }
 
-  const handleStopStream = () => {
-    if (peerC || peerS) {
-      peerC.removeStream(streamC);
-      stopBothVideoAndAudio(streamC);
+  const stopBothVideoAndAudio = (stream) => {
+    try {
+      stream.getTracks().forEach(track => track.stop())
+    }catch (e) {
+
     }
-
-    if (streamC || streamS)
-      videoTagS.current.srcObject = null;
-    videoTagC.current.srcObject = null;
-    setStreamC(undefined);
-    setStreamS(undefined);
-
   }
 
+  const handleStopStream = (stream) => {
+    try {
+      if (peerC || peerS) {
+        stopBothVideoAndAudio(stream);
+        stopBothVideoAndAudio(streamC);
+        stopBothVideoAndAudio(cam);
+        stopBothVideoAndAudio(screen);
+        peerC.removeStream(streamC);
+      }
+      // setAlreadyStream({cam: false, screen: false})
+      if (streamC || streamS) {
+        videoTagC.current.pause()
+        videoTagS.current.srcObject = null;
+        videoTagC.current.srcObject = null;
+        videoTagC.current.src = '';
+
+        setStreamS(undefined);
+      }
+    } catch (e) {
+
+    }
+  }
+
+
+  const handleStopCamStream = () => {
+    setAlreadyStream({...alreadyStream, cam: false})
+    if (!alreadyStream.screen) handleStopStream(cam)
+    else {
+      merger.addStream(screen)
+      merger.removeStream(streamC);
+    }
+  }
+
+  const handleStopScreenStream = () => {
+    setAlreadyStream({...alreadyStream, screen: false})
+    if (!alreadyStream.cam) handleStopStream(screen)
+    else {
+      merger.addStream(cam)
+      merger.removeStream(streamC);
+    }
+  }
 
   return <div className={s.main}>
 
@@ -142,7 +286,10 @@ export const Index = () => {
     </div>
 
     <div className={s.botom}>
-      <button onClick={handleStartStream}>СТРИМИТЬ</button>
+      <button
+        onClick={alreadyStream.cam ? handleStopCamStream : handleStartCamStream}>{alreadyStream.cam ? "ВЫКЛ КАМЕРУ" : "СТРИМИТЬ"}</button>
+      <button
+        onClick={alreadyStream.screen ? handleStopScreenStream : handleStartScreenCapture}>{alreadyStream.screen ? "ВЫКЛ ПОКАЗ ЭКРАНА" : "ПОКАЗАТЬ ЭКРАН"}</button>
       <button onClick={handleWatchStream}>СМОТРЕТЬ</button>
       <button onClick={handleStopStream}>СТОП</button>
     </div>
