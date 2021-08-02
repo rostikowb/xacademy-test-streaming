@@ -13,9 +13,7 @@ export const Index = () => {
   const [cam, setCam] = useState()
   const [screen, setScreen] = useState()
   const [streamC, setStreamC] = useState()
-  // const [streamS, setStreamS] = useState()
   const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
-  // const [streamS, setStreamS] = useState()
   const [merger] = useState(new VideoStreamMerger())
   const [mergerS] = useState(new VideoStreamMerger())
   const [gotAnswer, setGotAnswer] = useState(false)
@@ -76,16 +74,16 @@ export const Index = () => {
       }
     }
   }, [peerOffer, peerS])
-  // console.log(streamS);
+
   useEffect(() => {
     if (!ws) return;
 
     console.log('DFSDF');
-    peerS.on('stream', (stream) => {
+    peerS.on('stream', async (stream) => {
       console.log('stream from server');
       console.log(stream);
       console.log('mergerS.result', mergerS.result);
-      startMainScreen(stream)
+      await startMainScreen(stream)
       // setStreamS(stream)
         // mergerS.addStream(stream)
         // console.log('mergerS.result2', mergerS.result);
@@ -285,33 +283,10 @@ export const Index = () => {
 //     });
 //   }
 
-  // useEffect(() => {
-  //   console.log(merger.result , peerC , streamC);
-  //   if (merger.result && peerC && streamC) {
-  //     // const stream = merger.result
-  //     // try {
-  //     //   peerC.replaceTrack(streamC.getVideoTracks()[0], stream.getVideoTracks()[0], streamC)
-  //     // }catch (e) {
-  //     //   console.log(e);
-  //     // }
-  //
-  //     console.log('MERGER.RESULT RELOAD');
-  //
-  //     try {
-  //       videoTagC.current.srcObject = merger.result
-  //       videoTagC.current.play()
-  //     }catch (e) {
-  //
-  //     }
-  //
-  //
-  //   }
-  // }, [peerC, streamC, merger.result])
-
   const startSmartScreen = async (stream) => {
     try {
-      console.log('cam', cam);
-      console.log('merger.result', merger.result);
+      // console.log('cam', cam);
+      // console.log('merger.result', merger.result);
       videoTagC.current.srcObject = merger.result
       await videoTagC.current.play()
     } catch (e) {
@@ -319,8 +294,15 @@ export const Index = () => {
     }
   }
   const startMainScreen = async (stream) =>{
-    videoTagS.current.srcObject = stream
-    videoTagS.current.play()
+    try{
+      const videoPlayer = document.getElementById('videoS')
+      merger.addMediaElement('videoS', videoPlayer)
+      videoTagS.current.srcObject = stream
+
+      await videoPlayer.play()
+      await videoTagC.current.play()
+    }catch (e) {
+    }
   }
 
   const handleWatchStream = async () => {
@@ -391,7 +373,7 @@ export const Index = () => {
   return <div className={s.main}>
 
     <div className={s.videoBox}>
-      <video ref={videoTagS}/>
+      <video id='videoS' ref={videoTagS}/>
     </div>
 
     <div className={s.videoCStrimBox}>
