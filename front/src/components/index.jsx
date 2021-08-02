@@ -1,14 +1,23 @@
-import React, {useContext, useEffect, useRef, useState} from "react";
+import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import {useSelector} from "react-redux";
 import Peer from "simple-peer"
 import s from './global.module.css'
 import {WebSocketContext} from "../sockets/websocket";
+import getusermedia from "getusermedia";
+import {VideoStreamMerger} from "video-stream-merger";
+import {CONFIG_PEER} from "../config";
 
 export const Index = () => {
   const [peerC, setPeerC] = useState()
-  const [peerS] = useState()
+  let peerS = useMemo(() => new Peer({initiator: false, config: CONFIG_PEER}), [])
+  const [cam, setCam] = useState()
+  const [screen, setScreen] = useState()
   const [streamC, setStreamC] = useState()
-  const [streamS, setStreamS] = useState()
+  // const [streamS, setStreamS] = useState()
+  const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
+  // const [streamS, setStreamS] = useState()
+  const [merger] = useState(new VideoStreamMerger())
+  const [mergerS] = useState(new VideoStreamMerger())
   const [gotAnswer, setGotAnswer] = useState(false)
   const peerAnswer = useSelector(state => state.main.peerAnswer);
   const peerOffer = useSelector(state => state.main.peerOffer);
@@ -21,7 +30,8 @@ export const Index = () => {
   const peerCStart = (stream) => {
     const peer = new Peer({
       initiator: true,
-      stream: stream,
+      config: CONFIG_PEER,
+      stream,
     })
     setPeerC(peer)
 
@@ -37,46 +47,224 @@ export const Index = () => {
   }
 
   useEffect(() => {
+    if (merger) merger.start();
+  }, [merger])
+
+  useEffect(() => {
+    if (mergerS) mergerS.start();
+  }, [mergerS])
+
+  useEffect(() => {
     if (peerAnswer.tmp) {
-      setGotAnswer(true)
-      console.log(peerAnswer.tmp);
-      peerC.signal(peerAnswer.tmp)
+
+      // console.log(peerAnswer.tmp);
+      try {
+        peerC.signal(peerAnswer.tmp)
+        setGotAnswer(true)
+      } catch (e) {
+        console.log(e);
+      }
     }
-  }, [peerAnswer])
+  }, [peerAnswer, peerC])
 
   useEffect(() => {
     if (peerOffer.tmp) {
-      let peer = new Peer({
-        initiator: false,
-      })
-      peer.on('stream', function (stream) {
-        videoTagS.current.srcObject = stream
-        videoTagS.current.play()
-      })
-      peer.on('signal', function (data) {
-        ws.sendNewAnswer(data)
-      })
-      peer.signal(peerOffer.tmp)
-    }
-  }, [peerOffer])
+      try {
+        peerS.signal(peerOffer.tmp)
+      } catch (e) {
 
-  const stopBothVideoAndAudio = (stream) => {
-    stream.getTracks().forEach((track) => {
-      if (track.readyState === 'live') {
-        track.stop();
       }
-    });
+    }
+  }, [peerOffer, peerS])
+  // console.log(streamS);
+  useEffect(() => {
+    if (!ws) return;
+
+    console.log('DFSDF');
+    peerS.on('stream', (stream) => {
+      console.log('stream from server');
+      console.log(stream);
+      console.log('mergerS.result', mergerS.result);
+      startMainScreen(stream)
+      // setStreamS(stream)
+        // mergerS.addStream(stream)
+        // console.log('mergerS.result2', mergerS.result);
+        // startMainScreen(mergerS.result)
+
+      // videoTagS.current.srcObject = stream
+      // videoTagS.current.play()
+
+    })
+    peerS.on('signal', (data) => {
+      ws.sendNewAnswer(data)
+    })
+    peerS.on('close', () => {
+      setPeerC(null);
+    })
+    peerS.on('error', (err) => {
+      console.trace(err);
+    })
+    peerS.on('track', async (track, stream) => {
+
+      // let i = 5
+      // while (i--){
+      //   try {
+
+      //     console.log('YES');
+      //     break;
+      //   }catch (e) {
+      //     console.log(e);
+      //   }
+      // }
+
+      // console.log(track);
+      // console.log(stream);
+    })
+  }, [ws, peerS])
+
+
+  const getWebCam = async () => {
+    // const data = await new Promise(resolve => getusermedia({video: true, audio: true}, (err, webcamStream) => {
+    //   resolve(webcamStream)
+    // }))
+    // console.log('data', data);
+    const data = await navigator.mediaDevices.getUserMedia({video: true, audio: true})
+    setCam(data)
+    return data
   }
 
-  const newStreamCamVoice = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    })
-    ws.sendNewStreamer()
-    setStreamC(stream)
+  const getScreen = async () => {
+    try {
+      const data = await navigator.mediaDevices.getDisplayMedia()
+      setScreen(data)
+      return data
+    } catch (e) {
+      return false;
+    }
+  }
 
-    peerCStart(stream)
+  const addStreamToPeer = (stream) => {
+    if (!peerC) {
+      ws.sendNewStreamer()
+      peerCStart(stream)
+    } else {
+      try {
+        peerC.addStream(stream)
+      } catch (e) {
+        //   console.log('catch1', e);
+        //   try {
+        //     peerC.removeStream(stream)
+        //     peerC.addStream(stream)
+        //   }catch (e) {
+        //     console.log('catch2', e);
+        //   }
+        //   console.log(e);
+      }
+    }
+  }
+
+  const handleStartCamStream = async () => {
+
+    try {
+      if (alreadyStream.cam) return;
+
+      if (!alreadyStream.screen) {
+        const webcamStream = await getWebCam();
+        if (!webcamStream) return;
+
+        merger.addStream(webcamStream)
+        // merger.start()
+
+        addStreamToPeer(merger.result)
+        setStreamC(merger.result)
+        setAlreadyStream({...alreadyStream, cam: true})
+        await startSmartScreen(merger.result)
+      } else {
+        await startCamAndScreen(merger.result, 'screen')
+      }
+    }catch (e) {
+      console.log(e);
+    }
+
+  }
+
+  const handleStartScreenCapture = async () => {
+    if (alreadyStream.screen) return;
+
+    if (!alreadyStream.cam) {
+      const screenStream = await getScreen();
+      if (!screenStream) return;
+      // merger.start()
+
+      merger.addStream(screenStream)
+      addStreamToPeer(merger.result)
+      setStreamC(merger.result)
+      setAlreadyStream({...alreadyStream, screen: true})
+      await startSmartScreen(merger.result)
+    } else {
+      await startCamAndScreen(merger.result, 'cam')
+    }
+  }
+
+  const startCamAndScreen = async (streamRm) => {
+    let Cam, Screen
+    if (cam) Cam = cam;
+    else {
+      Cam = await getWebCam();
+      console.log('AAAAAAAAA');
+    }
+    if (screen) Screen = screen;
+    else {
+      Screen = await getScreen()
+    }
+
+    // stopBothVideoAndAudio(cam)
+    // stopBothVideoAndAudio(screen)
+
+    if (!Cam || !Screen) return;
+
+    setAlreadyStream({cam: true, screen: true})
+    try {
+      merger.removeStream(streamRm)
+    } catch (e) {
+      console.log(e);
+    }
+
+    merger.addStream(Screen, {
+      x: 0,
+      y: 0,
+      width: merger.width,
+      height: merger.height,
+      mute: true
+    })
+    console.log('CAM MERGE', Cam);
+    merger.addStream(Cam, {
+      x: merger.width - 150,
+      y: merger.height - 150,
+      width: 150,
+      height: 150,
+      mute: false
+    })
+
+    try {
+      // merger.removeStream(streamRm)
+    } catch (e) {
+      console.log(e);
+    }
+
+    console.log('peerC', peerC);
+
+    try {
+      // merger.start()
+      const stream = merger.result;
+      // peerC.removeStream(streamRm)
+      // peerC.addStream(stream)
+      // replaceStreamToServ(stream)
+      // setStreamC(stream)
+      console.log('peerC2', peerC);
+    } catch (e) {
+      console.log(e);
+    }
   }
 
 //   // stop only camera
@@ -97,39 +285,108 @@ export const Index = () => {
 //     });
 //   }
 
-  useEffect(() => {
-    if (streamC) {
-      videoTagC.current.srcObject = streamC
-      videoTagC.current.play()
+  // useEffect(() => {
+  //   console.log(merger.result , peerC , streamC);
+  //   if (merger.result && peerC && streamC) {
+  //     // const stream = merger.result
+  //     // try {
+  //     //   peerC.replaceTrack(streamC.getVideoTracks()[0], stream.getVideoTracks()[0], streamC)
+  //     // }catch (e) {
+  //     //   console.log(e);
+  //     // }
+  //
+  //     console.log('MERGER.RESULT RELOAD');
+  //
+  //     try {
+  //       videoTagC.current.srcObject = merger.result
+  //       videoTagC.current.play()
+  //     }catch (e) {
+  //
+  //     }
+  //
+  //
+  //   }
+  // }, [peerC, streamC, merger.result])
+
+  const startSmartScreen = async (stream) => {
+    try {
+      console.log('cam', cam);
+      console.log('merger.result', merger.result);
+      videoTagC.current.srcObject = merger.result
+      await videoTagC.current.play()
+    } catch (e) {
+
     }
-  }, [streamC])
-
-  useEffect(() => {
-    if (streamC) peerS.addStream(streamS);
-  }, [streamS])
-
-  const handleStartStream = async () => {
-    await newStreamCamVoice()
+  }
+  const startMainScreen = async (stream) =>{
+    videoTagS.current.srcObject = stream
+    videoTagS.current.play()
   }
 
   const handleWatchStream = async () => {
     ws.sendNewReceiver()
   }
 
-  const handleStopStream = () => {
-    if (peerC || peerS) {
-      peerC.removeStream(streamC);
-      stopBothVideoAndAudio(streamC);
+  const stopBothVideoAndAudio = (stream) => {
+    try {
+      stream.getTracks().forEach(track => track.stop())
+    } catch (e) {
+
     }
-
-    if (streamC || streamS)
-      videoTagS.current.srcObject = null;
-    videoTagC.current.srcObject = null;
-    setStreamC(undefined);
-    setStreamS(undefined);
-
   }
 
+  const handleStopStream = async (stream) => {
+    try {
+      // if (peerC || peerS) {
+      //   stopBothVideoAndAudio(stream);
+        // stopBothVideoAndAudio(streamC);
+        // stopBothVideoAndAudio(merger.result);
+        stopBothVideoAndAudio(cam);
+        stopBothVideoAndAudio(screen);
+      console.log('merger', merger);
+      setCam(null)
+        setScreen(null)
+      console.log('STOOOOOOOOP');
+      // peerC.removeStream(streamC);
+      // }
+      setAlreadyStream({cam: false, screen: false})
+
+      // await videoTagC.current.pause()
+      // videoTagS.current.srcObject = null;
+      // videoTagC.current.srcObject = null;
+      // videoTagC.current.src = '';
+
+      // setStreamS(undefined);
+
+    } catch (e) {
+      console.log('ERRRRR', e);
+    }
+  }
+
+
+  const handleStopCamStream = () => {
+    setAlreadyStream({...alreadyStream, cam: false})
+    if (!alreadyStream.screen) handleStopStream(cam)
+    else {
+      try {
+        merger.addStream(screen)
+        merger.removeStream(streamC);
+      } catch (e) {
+      }
+    }
+  }
+
+  const handleStopScreenStream = () => {
+    setAlreadyStream({...alreadyStream, screen: false})
+    if (!alreadyStream.cam) handleStopStream(screen)
+    else {
+      try {
+        merger.addStream(cam)
+        merger.removeStream(streamC);
+      } catch (e) {
+      }
+    }
+  }
 
   return <div className={s.main}>
 
@@ -142,7 +399,10 @@ export const Index = () => {
     </div>
 
     <div className={s.botom}>
-      <button onClick={handleStartStream}>СТРИМИТЬ</button>
+      <button
+        onClick={alreadyStream.cam ? handleStopCamStream : handleStartCamStream}>{alreadyStream.cam ? "ВЫКЛ КАМЕРУ" : "СТРИМИТЬ"}</button>
+      <button
+        onClick={alreadyStream.screen ? handleStopScreenStream : handleStartScreenCapture}>{alreadyStream.screen ? "ВЫКЛ ПОКАЗ ЭКРАНА" : "ПОКАЗАТЬ ЭКРАН"}</button>
       <button onClick={handleWatchStream}>СМОТРЕТЬ</button>
       <button onClick={handleStopStream}>СТОП</button>
     </div>
