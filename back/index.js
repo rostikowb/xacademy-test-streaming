@@ -39,24 +39,25 @@ const port = process.env.PORT || 3999
 let Streamer = {}
 let Receiver = {}
 
-io.on('connection', (socket) => {
-  console.log('connect');
-  socket.on('NewClientStreamer', () => {
-    let peer = new Peer({
-      initiator: false,
+  io.on('connection', (socket) => {
+    console.log('connect');
+    socket.on('NewClientStreamer', () => {
+      let peer = new Peer({
+        initiator: false,
       config: CONFIG_PEER,
-      wrtc,
-    })
-    Receiver = {peer}
-    peer.on('signal', (data) => {
-      socket.emit('Answer', data)
-    })
-    peer.on('close', () => {
-      console.log('sssss');
-      Receiver = {}
-    })
-    peer.on('stream', (stream) => {
-      console.log('sTREAM');
+        config: CONFIG_PEER,
+        wrtc,
+      })
+      Receiver = {peer}
+      peer.on('signal', (data) => {
+        socket.emit('Answer', data)
+      })
+      peer.on('close', () => {
+        console.log('sssss');
+        Receiver = {}
+      })
+      peer.on('stream', (stream) => {
+        console.log('sTREAM');
 
       // const blob = new Blob(stream, {type: 'application/octet-stream'})
       // console.log(blob);
@@ -82,11 +83,11 @@ io.on('connection', (socket) => {
     })
     peer.on('error', console.trace)
 
-    console.log('NewClientStreamer');
-    // socket.emit('CreateClientStreamerPeer')
-  })
+      console.log('NewClientStreamer');
+      // socket.emit('CreateClientStreamerPeer')
+    })
 
-  socket.on('Offer', (offer) => {
+    socket.on('Offer', (offer) => {
     if (Receiver.peer) Receiver.peer.signal(offer)
   })
 
@@ -115,9 +116,9 @@ io.on('connection', (socket) => {
     let peer = new Peer({
       initiator: true,
       config: CONFIG_PEER,
-      wrtc,
-      stream: Receiver.stream,
-    })
+        wrtc,
+        stream: Receiver.stream,
+      })
 
     peer.on('signal', (offer) => {
       // console.log(Streamer[socket.id].gotAnswer);
@@ -141,17 +142,21 @@ io.on('connection', (socket) => {
       delete Streamer[socket.id];
     })
 
-    Streamer[socket.id].peer = peer
+      Streamer[socket.id].peer = peer
 
-    socket.on('ClientAnswer', (data) => {
-      if (Streamer[socket.id]) {
-        Streamer[socket.id].gotAnswer = true
-        Streamer[socket.id].peer.signal(data)
-      }
+      socket.on('ClientAnswer', (data) => {
+        if (Streamer[socket.id]) {
+          Streamer[socket.id].gotAnswer = true
+          Streamer[socket.id].peer.signal(data)
+        }
+      })
+
+      console.log(Object.keys(Streamer));
+
+
     })
-
-    console.log(Object.keys(Streamer));
   })
-})
+
+
 
 server.listen(port, () => console.log(`Active on ${port} port`))
