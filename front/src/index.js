@@ -6,22 +6,22 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import {store} from "./redux/store";
 import {Provider} from "react-redux";
-import {MuiThemeProvider} from "material-ui";
+// import {MuiThemeProvider} from "material-ui";
 import {ruRU} from "@material-ui/core/locale";
-import {createMuiTheme, ThemeProvider} from "@material-ui/core/styles";
+// import {createMuiTheme, ThemeProvider} from "@material-ui/core/styles";
 import {WebsocketProvider} from './sockets/websocket';
 
 
-const theme = createMuiTheme({}, ruRU);
+// const theme = createMuiTheme({}, ruRU);
 ReactDOM.render(
   <React.StrictMode>
     <Provider store={store}>
       <WebsocketProvider>
-        <MuiThemeProvider>
-          <ThemeProvider theme={theme}>
+        {/*<MuiThemeProvider>*/}
+        {/*  <ThemeProvider theme={theme}>*/}
             <App/>
-          </ThemeProvider>
-        </MuiThemeProvider>
+        {/*  </ThemeProvider>*/}
+        {/*</MuiThemeProvider>*/}
       </WebsocketProvider>
     </Provider>
   </React.StrictMode>,

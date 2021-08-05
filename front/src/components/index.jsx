@@ -4,6 +4,7 @@ import Peer from "simple-peer"
 import s from './global.module.css'
 import {WebSocketContext} from "../sockets/websocket";
 import getusermedia from "getusermedia";
+import ReactPlayer from 'react-player'
 import {VideoStreamMerger} from "video-stream-merger";
 import {CONFIG_PEER} from "../config";
 
@@ -11,9 +12,12 @@ export const Index = () => {
   const [peerC, setPeerC] = useState()
   let peerS = useMemo(() => new Peer({initiator: false, config: CONFIG_PEER}), [])
   const [cam, setCam] = useState()
+  const [audio, setAudio] = useState()
   const [screen, setScreen] = useState()
   const [streamC, setStreamC] = useState()
+  const [streamS, setStreamS] = useState()
   const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
+  const [voice, setVoice] = useState(true)
   const [merger] = useState(new VideoStreamMerger())
   const [mergerS] = useState(new VideoStreamMerger())
   const [gotAnswer, setGotAnswer] = useState(false)
@@ -49,6 +53,12 @@ export const Index = () => {
   }, [merger])
 
   useEffect(() => {
+    if (merger.result) {
+      videoTagC.current.srcObject = merger.result
+    }
+  }, [merger])
+
+  useEffect(() => {
     if (mergerS) mergerS.start();
   }, [mergerS])
 
@@ -70,7 +80,6 @@ export const Index = () => {
       try {
         peerS.signal(peerOffer.tmp)
       } catch (e) {
-
       }
     }
   }, [peerOffer, peerS])
@@ -78,20 +87,11 @@ export const Index = () => {
   useEffect(() => {
     if (!ws) return;
 
-    console.log('DFSDF');
     peerS.on('stream', async (stream) => {
       console.log('stream from server');
-      console.log(stream);
-      console.log('mergerS.result', mergerS.result);
+      setStreamS(stream)
       await startMainScreen(stream)
-      // setStreamS(stream)
-        // mergerS.addStream(stream)
-        // console.log('mergerS.result2', mergerS.result);
-        // startMainScreen(mergerS.result)
-
       // videoTagS.current.srcObject = stream
-      // videoTagS.current.play()
-
     })
     peerS.on('signal', (data) => {
       ws.sendNewAnswer(data)
@@ -102,32 +102,51 @@ export const Index = () => {
     peerS.on('error', (err) => {
       console.trace(err);
     })
-    peerS.on('track', async (track, stream) => {
-
-      // let i = 5
-      // while (i--){
-      //   try {
-
-      //     console.log('YES');
-      //     break;
-      //   }catch (e) {
-      //     console.log(e);
-      //   }
-      // }
-
-      // console.log(track);
-      // console.log(stream);
-    })
   }, [ws, peerS])
 
+  useEffect(() => {
+    if (streamC) {
+      (async () => {
+        console.log(await videoTagC.current.play());
+      })()
+    }
+  }, [streamC])
 
-  const getWebCam = async () => {
+  // useEffect(()=>{
+  //
+  //   if (alreadyStream.cam || alreadyStream.screen) return;
+  //
+  //   const timeId = setTimeout(()=>{
+  //     ws.sendNewReceiver()
+  //
+  //   }, 2000)
+  // }, [])
+  //
+  // useEffect(() => {
+  //
+  //   if (alreadyStream.cam || alreadyStream.screen) return;
+  //   if (!streamS) return;
+  //   setTimeout(async () => {
+  //     await startMainScreen(streamS)
+  //     // ws.sendNewReceiver()
+  //
+  //   }, 2000)
+  // }, [streamS])
+
+
+  const getAudio = async () => {
+    const data = await navigator.mediaDevices.getUserMedia({audio: true})
+    setAudio(data);
+    return data
+  }
+
+  const getVideo = async () => {
     // const data = await new Promise(resolve => getusermedia({video: true, audio: true}, (err, webcamStream) => {
     //   resolve(webcamStream)
     // }))
     // console.log('data', data);
-    const data = await navigator.mediaDevices.getUserMedia({video: true, audio: true})
-    setCam(data)
+    const data = await navigator.mediaDevices.getUserMedia({video: true})
+    setCam(data);
     return data
   }
 
@@ -149,14 +168,7 @@ export const Index = () => {
       try {
         peerC.addStream(stream)
       } catch (e) {
-        //   console.log('catch1', e);
-        //   try {
-        //     peerC.removeStream(stream)
-        //     peerC.addStream(stream)
-        //   }catch (e) {
-        //     console.log('catch2', e);
-        //   }
-        //   console.log(e);
+
       }
     }
   }
@@ -167,10 +179,17 @@ export const Index = () => {
       if (alreadyStream.cam) return;
 
       if (!alreadyStream.screen) {
-        const webcamStream = await getWebCam();
-        if (!webcamStream) return;
+        const webcamStream = await getVideo();
+        const audioStream = await getAudio();
+        if (!webcamStream || !audioStream) return;
 
-        merger.addStream(webcamStream)
+        merger.addStream(webcamStream, {
+          x: 0,
+          y: 0,
+          width: merger.width,
+          height: merger.height,
+        })
+        merger.addStream(audioStream)
         // merger.start()
 
         addStreamToPeer(merger.result)
@@ -180,7 +199,7 @@ export const Index = () => {
       } else {
         await startCamAndScreen(merger.result, 'screen')
       }
-    }catch (e) {
+    } catch (e) {
       console.log(e);
     }
 
@@ -191,10 +210,12 @@ export const Index = () => {
 
     if (!alreadyStream.cam) {
       const screenStream = await getScreen();
-      if (!screenStream) return;
+      const audioStream = await getAudio();
+      if (!screenStream || !audioStream) return;
       // merger.start()
 
       merger.addStream(screenStream)
+      merger.addStream(audioStream)
       addStreamToPeer(merger.result)
       setStreamC(merger.result)
       setAlreadyStream({...alreadyStream, screen: true})
@@ -205,29 +226,32 @@ export const Index = () => {
   }
 
   const startCamAndScreen = async (streamRm) => {
-    let Cam, Screen
+    let Cam, Screen, Audio
     if (cam) Cam = cam;
     else {
-      Cam = await getWebCam();
-      console.log('AAAAAAAAA');
+      Cam = await getVideo();
+      setCam(Cam)
     }
     if (screen) Screen = screen;
     else {
       Screen = await getScreen()
+      setScreen(Screen)
     }
-
-    // stopBothVideoAndAudio(cam)
-    // stopBothVideoAndAudio(screen)
+    if (audio) Audio = audio;
+    else {
+      Audio = await getScreen()
+      setAudio(Audio)
+    }
 
     if (!Cam || !Screen) return;
 
     setAlreadyStream({cam: true, screen: true})
     try {
       merger.removeStream(streamRm)
+      merger.removeStream(audio)
     } catch (e) {
       console.log(e);
     }
-
     merger.addStream(Screen, {
       x: 0,
       y: 0,
@@ -235,7 +259,7 @@ export const Index = () => {
       height: merger.height,
       mute: true
     })
-    console.log('CAM MERGE', Cam);
+
     merger.addStream(Cam, {
       x: merger.width - 150,
       y: merger.height - 150,
@@ -243,26 +267,7 @@ export const Index = () => {
       height: 150,
       mute: false
     })
-
-    try {
-      // merger.removeStream(streamRm)
-    } catch (e) {
-      console.log(e);
-    }
-
-    console.log('peerC', peerC);
-
-    try {
-      // merger.start()
-      const stream = merger.result;
-      // peerC.removeStream(streamRm)
-      // peerC.addStream(stream)
-      // replaceStreamToServ(stream)
-      // setStreamC(stream)
-      console.log('peerC2', peerC);
-    } catch (e) {
-      console.log(e);
-    }
+    merger.addStream(Audio)
   }
 
 //   // stop only camera
@@ -285,24 +290,31 @@ export const Index = () => {
 
   const startSmartScreen = async (stream) => {
     try {
-      // console.log('cam', cam);
-      // console.log('merger.result', merger.result);
-      videoTagC.current.srcObject = merger.result
-      await videoTagC.current.play()
-    } catch (e) {
+      // const videoPlayer = document.getElementById('videoC')
+      // videoTagC.current.muted = true;
 
+      // merger.addMediaElement('videoC', videoPlayer)
+
+      videoTagC.current.srcObject = merger.result
+      videoTagC.current.addEventListener('error', err => {
+        console.log(err);
+      })
+
+      // await videoTagC.current.play()
+      // await videoPlayer.play()
+      // videoPlayer.addEventListener("pause", async () => {
+      //   // console.log(merger.result);
+      //
+      // })
+
+    } catch (e) {
+      console.log(e);
     }
   }
-  const startMainScreen = async (stream) =>{
-    try{
-      const videoPlayer = document.getElementById('videoS')
-      merger.addMediaElement('videoS', videoPlayer)
-      videoTagS.current.srcObject = stream
-
-      await videoPlayer.play()
-      await videoTagC.current.play()
-    }catch (e) {
-    }
+  const startMainScreen = async (stream) => {
+    // mergerS.addStream(stream)
+    videoTagS.current.srcObject = stream
+    videoTagS.current.volume = 0;
   }
 
   const handleWatchStream = async () => {
@@ -321,13 +333,19 @@ export const Index = () => {
     try {
       // if (peerC || peerS) {
       //   stopBothVideoAndAudio(stream);
-        // stopBothVideoAndAudio(streamC);
-        // stopBothVideoAndAudio(merger.result);
+      // stopBothVideoAndAudio(streamC);
+      // stopBothVideoAndAudio(merger.result);
+
+      try {
         stopBothVideoAndAudio(cam);
         stopBothVideoAndAudio(screen);
+        stopBothVideoAndAudio(audio);
+      } catch (e) {
+
+      }
       console.log('merger', merger);
       setCam(null)
-        setScreen(null)
+      setScreen(null)
       console.log('STOOOOOOOOP');
       // peerC.removeStream(streamC);
       // }
@@ -352,6 +370,7 @@ export const Index = () => {
     else {
       try {
         merger.addStream(screen)
+        merger.addStream(audio)
         merger.removeStream(streamC);
       } catch (e) {
       }
@@ -370,14 +389,24 @@ export const Index = () => {
     }
   }
 
+  const handleManageVoice = async () => {
+    if (voice) {
+      merger.removeStream(audio)
+      setVoice(false)
+    } else {
+      merger.addStream(audio)
+      setVoice(true)
+    }
+  }
+
   return <div className={s.main}>
 
     <div className={s.videoBox}>
-      <video id='videoS' ref={videoTagS}/>
+      <video muted controls ref={videoTagS}/>
     </div>
 
     <div className={s.videoCStrimBox}>
-      <video ref={videoTagC}/>
+      <video controls muted id="videoC" ref={videoTagC}/>
     </div>
 
     <div className={s.botom}>
@@ -385,6 +414,8 @@ export const Index = () => {
         onClick={alreadyStream.cam ? handleStopCamStream : handleStartCamStream}>{alreadyStream.cam ? "ВЫКЛ КАМЕРУ" : "СТРИМИТЬ"}</button>
       <button
         onClick={alreadyStream.screen ? handleStopScreenStream : handleStartScreenCapture}>{alreadyStream.screen ? "ВЫКЛ ПОКАЗ ЭКРАНА" : "ПОКАЗАТЬ ЭКРАН"}</button>
+      <button
+        onClick={handleManageVoice}>{voice ? "ВЫКЛ ЗВУК" : "ВКЛ ЗВУК"}</button>
       <button onClick={handleWatchStream}>СМОТРЕТЬ</button>
       <button onClick={handleStopStream}>СТОП</button>
     </div>
