@@ -313,8 +313,22 @@ export const Index = () => {
   }
   const startMainScreen = async (stream) => {
     // mergerS.addStream(stream)
+    // videoTagS.current.volume = 0;
     videoTagS.current.srcObject = stream
-    videoTagS.current.volume = 0;
+
+    videoTagS.current.addEventListener("play", async () => {
+      // console.log(merger.result);
+      try {
+        const ctx = new AudioContext();
+        const videoCyx = ctx.createMediaElementSource(videoTagS.current)
+        const streamCtx = ctx.createMediaStreamSource(stream)
+        await streamCtx.context.resume();
+        await videoCyx.context.resume();
+      }catch (e) {
+        console.trace(e);
+      }
+    })
+
   }
 
   const handleWatchStream = async () => {

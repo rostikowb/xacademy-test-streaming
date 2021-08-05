@@ -1,4 +1,4 @@
-// export const WS_BASE = 'ws://192.168.8.101:3999'
+// export const WS_BASE = 'ws://192.168.8.104:3999'
 export const WS_BASE = 'ws://194.177.20.120:3999'
 export const CONFIG_PEER = {
   iceServers: [{
