@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
 
 
     }
-    console.log('ssssRRRRRRRRRRRRRss', Receiver.stream);
+
     Streamer[socket.id] = {
       gotAnswer: false,
       peer: null
