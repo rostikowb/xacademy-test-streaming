@@ -4,18 +4,12 @@ import './index.css';
 import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
-import {store} from "./redux/store";
-import {Provider} from "react-redux";
-// import {MuiThemeProvider} from "material-ui";
-import {ruRU} from "@material-ui/core/locale";
-// import {createMuiTheme, ThemeProvider} from "@material-ui/core/styles";
 import {WebsocketProvider} from './sockets/websocket';
 
 
 // const theme = createMuiTheme({}, ruRU);
 ReactDOM.render(
   <React.StrictMode>
-    <Provider store={store}>
       <WebsocketProvider>
         {/*<MuiThemeProvider>*/}
         {/*  <ThemeProvider theme={theme}>*/}
@@ -23,7 +17,6 @@ ReactDOM.render(
         {/*  </ThemeProvider>*/}
         {/*</MuiThemeProvider>*/}
       </WebsocketProvider>
-    </Provider>
   </React.StrictMode>,
   document.getElementById('root')
 );

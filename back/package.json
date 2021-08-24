@@ -5,9 +5,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "nodemon index.js",
     "start": "node index.js"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@nestjs/common": "^7.6.13",
     "@nestjs/core": "^7.6.13",
     "@nestjs/platform-express": "^7.6.13",
@@ -15,6 +17,8 @@
     "cross-blob": "^3.0.0",
     "express": "^4.17.1",
     "extendable-media-recorder": "^6.4.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "fluent-ffmpeg-multistream": "^1.0.0",
     "simple-peer": "^9.11.0",
     "socket.io": "^2.3.1",
     "wrtc": "^0.4.7"

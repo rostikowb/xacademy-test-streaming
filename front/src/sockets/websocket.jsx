@@ -1,8 +1,6 @@
 import React, {createContext, useEffect, useState} from 'react'
 import io from 'socket.io-client';
 import { WS_BASE } from '../config';
-import { useDispatch } from 'react-redux';
-import {answerServer, offerServer} from '../redux/actions/action';
 
 const WebSocketContext = createContext(null)
 
@@ -12,7 +10,6 @@ export const WebsocketProvider = ({ children }) => {
 
   const [ws, setWs] = useState()
   const [socket, setSocket] = useState()
-  const dispatch = useDispatch();
   const sendNewReceiver = () => socket.emit("NewClientReceiver");
   const sendNewStreamer = () => socket.emit("NewClientStreamer");
   const sendNewOffer = (data) => socket.emit("Offer", data);
@@ -22,6 +19,7 @@ export const WebsocketProvider = ({ children }) => {
     if (!socket) {
       console.log('новый сокет');
       setSocket(io(WS_BASE, {
+        // path: '/websocket',
         transports: ["websocket"]
       }))
     }
@@ -29,8 +27,8 @@ export const WebsocketProvider = ({ children }) => {
 
   useEffect(()=>{
     if(socket){
-      socket.on("Answer", (msg) => dispatch(answerServer(msg)))
-      socket.on("Offer", (msg) => dispatch(offerServer(msg)))
+      // socket.on("Answer", (msg) => dispatch(answerServer(msg)))
+      // socket.on("Offer", (msg) => dispatch(offerServer(msg)))
 
       setWs({
         socket,

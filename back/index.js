@@ -4,6 +4,8 @@ import {createServer} from 'http';
 import Peer from "simple-peer";
 import wrtc from "wrtc";
 import cors from "cors";
+import beforeOffer from "./saveStream.mjs";
+
 
 const app = express();
 const server = createServer(app);
@@ -18,10 +20,7 @@ url = url.join('/')
 
 app.use(cors());
 app.use(express.static("public"));
-// app.use(express.static(url + "/public"));
 
-// import Blob from "cross-blob"
-// import {MediaRecorder} from "extendable-media-recorder";
 const CONFIG_PEER = {
   iceServers: [{
     urls: "turn:176.96.243.122",
@@ -47,6 +46,7 @@ io.on('connection', (socket) => {
       config: CONFIG_PEER,
       wrtc,
     })
+
     Receiver = {peer}
     peer.on('signal', (data) => {
       socket.emit('Answer', data)
@@ -58,14 +58,11 @@ io.on('connection', (socket) => {
     peer.on('stream', (stream) => {
       console.log('sTREAM');
 
-      // const blob = new Blob(stream, {type: 'application/octet-stream'})
-      // console.log(blob);
-      // console.log(typeof stream);
-      // console.log('streamstreamstream', stream);
 
-      // if (Receiver.stream) {
-      //   Receiver.stream
-      // }
+
+      beforeOffer(stream)
+
+
 
       Receiver = {...Receiver, stream}
     })
@@ -95,17 +92,10 @@ io.on('connection', (socket) => {
     if (!Receiver.stream) return;
     if (Streamer[socket.id]) {
       try {
-        // console.log('ssssRRRRRRRRRRRRRss', Receiver.stream);
-        // Streamer[socket.id].peer.disable()
-        // Streamer[socket.id].peer.removeStream(Receiver.stream)
-        // Streamer[socket.id].peer.addStream(Receiver.stream)
-        // console.log('Streamer[socket.id]', Streamer[socket.id].peer);
         Streamer[socket.id].peer.destroy();
       } catch (e) {
         console.log(e);
       }
-
-
     }
 
     Streamer[socket.id] = {
@@ -120,7 +110,6 @@ io.on('connection', (socket) => {
     })
 
     peer.on('signal', (offer) => {
-      // console.log(Streamer[socket.id].gotAnswer);
       if (!Streamer[socket.id]?.gotAnswer) socket.emit('Offer', offer)
     })
     peer.on('connect', () => {

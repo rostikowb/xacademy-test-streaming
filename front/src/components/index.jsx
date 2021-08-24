@@ -1,5 +1,4 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
-import {useSelector} from "react-redux";
 import Peer from "simple-peer"
 import s from './global.module.css'
 import {WebSocketContext} from "../sockets/websocket";
@@ -14,17 +13,16 @@ export const Index = () => {
   const [screen, setScreen] = useState()
   const [streamC, setStreamC] = useState()
   const [streamS, setStreamS] = useState()
+  const [peerAnswer, setPeerAnswer] = useState()
+  const [peerOffer, setPeerOffer] = useState()
   const [isDisplayMainPlayer, setIsDisplayMainPlayer] = useState(false)
   const [isDisplaySmartPlayer, setIsDisplaySmartPlayer] = useState(false)
   const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
   const [voice, setVoice] = useState(true)
   const [merger, setMerger] = useState()
   const [gotAnswer, setGotAnswer] = useState(false)
-  const peerAnswer = useSelector(state => state.main.peerAnswer);
-  const peerOffer = useSelector(state => state.main.peerOffer);
   const videoTagS = useRef()
   const videoTagC = useRef()
-
 
   const ws = useContext(WebSocketContext);
 
@@ -46,6 +44,13 @@ export const Index = () => {
     })
 
   }
+
+  useEffect(()=>{
+    if(!ws?.socket) return;
+
+    ws.socket.on("Answer", (msg) => setPeerAnswer(msg))
+    ws.socket.on("Offer", (msg) => setPeerOffer(msg))
+  }, [ws?.socket])
 
   useEffect(() => {
     if (merger?.result) {
@@ -71,11 +76,10 @@ export const Index = () => {
   }, [isDisplayMainPlayer, streamS])
 
   useEffect(() => {
-    if (peerAnswer.tmp) {
+    if (peerAnswer) {
 
-      // console.log(peerAnswer.tmp);
       try {
-        peerC.signal(peerAnswer.tmp)
+        peerC.signal(peerAnswer)
         setGotAnswer(true)
       } catch (e) {
         console.log(e);
@@ -84,9 +88,10 @@ export const Index = () => {
   }, [peerAnswer, peerC])
 
   useEffect(() => {
-    if (peerOffer.tmp) {
+
+    if (peerOffer) {
       try {
-        peerS.signal(peerOffer.tmp)
+        peerS.signal(peerOffer)
       } catch (e) {
       }
     }
@@ -130,14 +135,23 @@ export const Index = () => {
     //   resolve(webcamStream)
     // }))
     // console.log('data', data);
-    const data = await navigator.mediaDevices.getUserMedia({video: true})
+
+    const data = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: {min: 640, ideal: 1280},
+        height: {min: 400, ideal: 720},
+      }
+    })
     setCam(data);
     return data
   }
 
   const getScreen = async () => {
     try {
-      const data = await navigator.mediaDevices.getDisplayMedia()
+      const data = await navigator.mediaDevices.getDisplayMedia({
+        width: {ideal: 1280},
+        height: {ideal: 720}
+      })
       setScreen(data)
       return data
     } catch (e) {
@@ -264,7 +278,7 @@ export const Index = () => {
     try {
 
       try {
-        merger._streams.forEach(stream=> merger.removeStream(stream))
+        merger._streams.forEach(stream => merger.removeStream(stream))
         setIsDisplaySmartPlayer(false)
       } catch (e) {
         console.log(e);
@@ -317,6 +331,7 @@ export const Index = () => {
   }
 
   const handleManageVoice = async () => {
+    console.log(merger.result);
     if (voice) {
       merger.removeStream(audio)
       setVoice(false)
