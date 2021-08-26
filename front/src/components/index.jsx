@@ -6,26 +6,41 @@ import {VideoStreamMerger} from "video-stream-merger";
 import {CONFIG_PEER} from "../config";
 
 export const Index = () => {
+
+  // useState - https://reactjs.org/docs/hooks-state.html по сути состояние
+  // в первый элемент масива записывается само состояние а во втоорой метод его изменения
+  // peer - это обект соединения p2p
+  // peerС - со стороны клиента | peerS - сервера, useMemo это просто что бы создать обект только 1 раз
   const [peerC, setPeerC] = useState()
   let peerS = useMemo(() => new Peer({initiator: false, config: CONFIG_PEER}), [])
+  // далее объекты стримов с устройства cam,audio,screen
   const [cam, setCam] = useState()
   const [audio, setAudio] = useState()
   const [screen, setScreen] = useState()
+  // объекты смердженых стримов 1 с клиента - исходящий, второй приходящий
+  // я незнаю может страницы стримера и зрителя нужно было разделить, это на ваше усмотрение
   const [streamC, setStreamC] = useState()
   const [streamS, setStreamS] = useState()
+  // это обекты для рукопожатия в p2p соединении
   const [peerAnswer, setPeerAnswer] = useState()
   const [peerOffer, setPeerOffer] = useState()
+  // тут по названию думаю понятно
   const [isDisplayMainPlayer, setIsDisplayMainPlayer] = useState(false)
   const [isDisplaySmartPlayer, setIsDisplaySmartPlayer] = useState(false)
   const [alreadyStream, setAlreadyStream] = useState({cam: false, screen: false})
   const [voice, setVoice] = useState(true)
+  // объект мерджера который обеденяет стримы
   const [merger, setMerger] = useState()
+  // буль обозначающий была ли попытка рукопожатия
   const [gotAnswer, setGotAnswer] = useState(false)
+  // по сути просто ссылки на два плеера как бы document.getElementBy...
   const videoTagS = useRef()
   const videoTagC = useRef()
 
+  // получаем из провайдера открытый сокет и его методы
   const ws = useContext(WebSocketContext);
 
+  // метод открытия p2p для начала стрима
   const peerCStart = (stream) => {
     const peer = new Peer({
       initiator: true,
@@ -38,13 +53,13 @@ export const Index = () => {
       if (!gotAnswer) ws.sendNewOffer(data);
     })
     peer.on('connect', data => {
-      // peerC.signal(data)
       console.log('connect');
       peer.send('test connect - OK')
     })
 
   }
 
+  // листенеры ответов от сокета, обявляються если ws?.socket не false
   useEffect(()=>{
     if(!ws?.socket) return;
 
@@ -52,6 +67,7 @@ export const Index = () => {
     ws.socket.on("Offer", (msg) => setPeerOffer(msg))
   }, [ws?.socket])
 
+  // при появлении единого стрима, или передает его плееру или активирует плеер если его нет
   useEffect(() => {
     if (merger?.result) {
       if (videoTagC?.current) videoTagC.current.srcObject = merger.result;
@@ -59,6 +75,7 @@ export const Index = () => {
     }
   }, [merger?.result])
 
+  // передает единый стрим плееру как только тот появиться
   useEffect(() => {
     if (isDisplaySmartPlayer) {
       videoTagC.current.srcObject = merger.result
@@ -67,6 +84,7 @@ export const Index = () => {
 
   }, [isDisplaySmartPlayer])
 
+  // если есть главный плеер и стрим с сервера то передает ему
   useEffect(() => {
     if (isDisplayMainPlayer && streamS) {
       videoTagS.current.srcObject = streamS
@@ -75,6 +93,7 @@ export const Index = () => {
 
   }, [isDisplayMainPlayer, streamS])
 
+  // часть рукопожатия - при появлении peerAnswer передает его peerC
   useEffect(() => {
     if (peerAnswer) {
 
@@ -87,6 +106,7 @@ export const Index = () => {
     }
   }, [peerAnswer, peerC])
 
+  // часть рукопожатия - при появлении peerOffer передает его peerS
   useEffect(() => {
 
     if (peerOffer) {
@@ -97,14 +117,17 @@ export const Index = () => {
     }
   }, [peerOffer, peerS])
 
+  // если ws, peerS инициализируються то подписываються события
   useEffect(() => {
     if (!ws) return;
 
+    // принимаеться стрим
     peerS.on('stream', async (stream) => {
       console.log('stream from server');
       setStreamS(stream)
       // videoTagS.current.srcObject = stream
     })
+    // часть рукопожатия
     peerS.on('signal', (data) => {
       ws.sendNewAnswer(data)
     })
@@ -116,6 +139,7 @@ export const Index = () => {
     })
   }, [ws, peerS])
 
+  // если появляеться тру streamC то запускаем videoTagC плеер
   useEffect(() => {
     if (streamC) {
       (async () => {
@@ -124,12 +148,12 @@ export const Index = () => {
     }
   }, [streamC])
 
+// методы получения стримов из устройств по запросу
   const getAudio = async () => {
     const data = await navigator.mediaDevices.getUserMedia({audio: true})
     setAudio(data);
     return data
   }
-
   const getVideo = async () => {
     // const data = await new Promise(resolve => getusermedia({video: true, audio: true}, (err, webcamStream) => {
     //   resolve(webcamStream)
@@ -145,7 +169,6 @@ export const Index = () => {
     setCam(data);
     return data
   }
-
   const getScreen = async () => {
     try {
       const data = await navigator.mediaDevices.getDisplayMedia({
@@ -159,6 +182,7 @@ export const Index = () => {
     }
   }
 
+  // запуск соединения и добавлением стрима
   const addStreamToPeer = (stream) => {
     if (!peerC) {
       ws.sendNewStreamer()
@@ -172,6 +196,7 @@ export const Index = () => {
     }
   }
 
+  // метод старта стрима/получения данных с устройств/переключения и мерджа
   const handleStartStream = async (type) => {
     if (alreadyStream[type]) return;
     let merg;
@@ -216,6 +241,7 @@ export const Index = () => {
     console.log('merg', merg);
   }
 
+  // метод соединения скрина и камеры
   const startCamAndScreen = async (streamRm) => {
     let Cam, Screen, Audio
     if (cam) Cam = cam;
@@ -261,6 +287,7 @@ export const Index = () => {
     merger.addStream(Audio)
   }
 
+  // метод старта просмотра стрима(запрос по сокетам на добавления зрителя и установку соединения)
   const handleWatchStream = async () => {
     ws.sendNewReceiver()
     setIsDisplayMainPlayer(true)
@@ -274,6 +301,7 @@ export const Index = () => {
     }
   }
 
+  // остановка стрима которая не то что бы прямо останавливает, но данные с устройств не передает
   const handleStopStream = async () => {
     try {
 
@@ -341,6 +369,7 @@ export const Index = () => {
     }
   }
 
+  // отображение
   return <div className={s.main}>
 
     <div className={s.videoBox}>

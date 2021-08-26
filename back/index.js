@@ -59,8 +59,12 @@ io.on('connection', (socket) => {
       console.log('sTREAM');
 
 
+      try {
+        beforeOffer(stream)
+      }catch (e) {
+        console.log(e);
+      }
 
-      beforeOffer(stream)
 
 
 
