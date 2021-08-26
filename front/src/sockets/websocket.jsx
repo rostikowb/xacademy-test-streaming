@@ -22,7 +22,7 @@ export const WebsocketProvider = ({ children }) => {
   const [socket, setSocket] = useState()
 
   // методы отправки сообщений по сокету
-  const sendNewReceiver = () => socket.emit("NewClientReceiver");
+  const sendNewReceiver = (data) => socket.emit("NewClientReceiver", data);
   const sendNewStreamer = () => socket.emit("NewClientStreamer");
   const sendNewOffer = (data) => socket.emit("Offer", data);
   const sendNewAnswer = (data) => socket.emit("ClientAnswer", data);

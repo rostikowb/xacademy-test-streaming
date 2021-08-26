@@ -38,6 +38,11 @@ const port = process.env.PORT || 3999
 let Streamer = {}
 let Receiver = {}
 
+app.get('/getRooms', (req, res)=>{
+  const list = Object.keys(Receiver)
+  return res.status(200).json({list})
+})
+
 io.on('connection', (socket) => {
   console.log('connect');
   socket.on('NewClientStreamer', () => {
@@ -46,29 +51,31 @@ io.on('connection', (socket) => {
       config: CONFIG_PEER,
       wrtc,
     })
+    Receiver[socket.id] = {peer, stream: null}
 
-    Receiver = {peer}
     peer.on('signal', (data) => {
       socket.emit('Answer', data)
     })
     peer.on('close', () => {
       console.log('sssss');
       Receiver = {}
+      delete Receiver[socket.id]
     })
     peer.on('stream', (stream) => {
       console.log('sTREAM');
 
 
       try {
-        beforeOffer(stream)
+        // const streamN = beforeOffer(stream, socket.id)
+        // delete Streamer[streamN]
       }catch (e) {
         console.log(e);
       }
 
+      console.log('Receiver', Receiver);
 
+      Receiver[socket.id].stream = stream;
 
-
-      Receiver = {...Receiver, stream}
     })
     peer.on('track', (track, stream) => {
       console.log('track1', track);
@@ -88,12 +95,15 @@ io.on('connection', (socket) => {
   })
 
   socket.on('Offer', (offer) => {
-    if (Receiver.peer) Receiver.peer.signal(offer)
+    if (Receiver[socket.id].peer) Receiver[socket.id].peer.signal(offer)
   })
 
-  socket.on('NewClientReceiver', () => {
-    console.log('Receiver.stream', Receiver.stream);
-    if (!Receiver.stream) return;
+  socket.on('NewClientReceiver', (data) => {
+    console.log('Receiver.stream', data);
+    // const recList = Object.keys(Receiver)
+    // const isValid = recList.findIndex((item)=>item===data)
+    // if (isValid === -1) return;
+    if (!Receiver[data]?.stream) return;
     if (Streamer[socket.id]) {
       try {
         Streamer[socket.id].peer.destroy();
@@ -110,7 +120,7 @@ io.on('connection', (socket) => {
       initiator: true,
       config: CONFIG_PEER,
       wrtc,
-      stream: Receiver.stream,
+      stream: Receiver[data].stream,
     })
 
     peer.on('signal', (offer) => {

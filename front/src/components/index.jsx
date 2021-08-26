@@ -36,6 +36,7 @@ export const Index = () => {
   // по сути просто ссылки на два плеера как бы document.getElementBy...
   const videoTagS = useRef()
   const videoTagC = useRef()
+  const [chanel, setChanel] = useState('')
 
   // получаем из провайдера открытый сокет и его методы
   const ws = useContext(WebSocketContext);
@@ -289,7 +290,7 @@ export const Index = () => {
 
   // метод старта просмотра стрима(запрос по сокетам на добавления зрителя и установку соединения)
   const handleWatchStream = async () => {
-    ws.sendNewReceiver()
+    ws.sendNewReceiver(chanel)
     setIsDisplayMainPlayer(true)
   }
 
@@ -381,13 +382,17 @@ export const Index = () => {
     </div>
 
     <div className={s.botom}>
+      <div className={s.chanelBox}>
+        <input type="text" value={chanel} onChange={({target})=>setChanel(target.value)}/>
+        <button onClick={handleWatchStream}>СМОТРЕТЬ</button>
+      </div>
       <button
         onClick={alreadyStream.cam ? handleStopCamStream : () => handleStartStream('cam')}>{alreadyStream.cam ? "ВЫКЛ КАМЕРУ" : "СТРИМИТЬ"}</button>
       <button
         onClick={alreadyStream.screen ? handleStopScreenStream : () => handleStartStream('screen')}>{alreadyStream.screen ? "ВЫКЛ ПОКАЗ ЭКРАНА" : "ПОКАЗАТЬ ЭКРАН"}</button>
       <button
         onClick={handleManageVoice}>{voice ? "ВЫКЛ ЗВУК" : "ВКЛ ЗВУК"}</button>
-      <button onClick={handleWatchStream}>СМОТРЕТЬ</button>
+
       <button onClick={handleStopStream}>СТОП</button>
     </div>
 

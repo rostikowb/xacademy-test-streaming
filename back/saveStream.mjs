@@ -11,12 +11,13 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const VIDEO_OUTPUT_SIZE = '720x?'
 // const VIDEO_OUTPUT_SIZE = '320x240'
 // const VIDEO_OUTPUT_SIZE = '720x720'
-const VIDEO_OUTPUT_FILE = './recording.mp4'
+const VIDEO_OUTPUT_PATH = './video/'
+const VIDEO_OUTPUT_FILE = './video/recording.mp4'
 
 let UID = 0;
 
 
-export default function beforeOffer(mediaStream) {
+export default function beforeOffer(mediaStream, id) {
   const allTracks = mediaStream.getTracks()
   let audioTrack, videoTrack;
 
@@ -29,6 +30,12 @@ export default function beforeOffer(mediaStream) {
 
   const streams = [];
 
+  try {
+    fs.mkdir(`./video/${id}/`)
+  }catch (e) {
+
+  }
+
 
   console.log('start record');
   videoSink.addEventListener('frame', ({frame: {width, height, data}}) => {
@@ -39,7 +46,7 @@ export default function beforeOffer(mediaStream) {
       UID++;
 
       const stream = {
-        recordPath: './recording-' + size + '-' + UID + '.mp4',
+        recordPath: `./video/${id}/recording-${size}-${UID}.mp4`,
         size,
         video: new PassThrough(),
         audio: new PassThrough()
