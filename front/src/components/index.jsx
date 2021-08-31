@@ -89,6 +89,7 @@ export const Index = () => {
   useEffect(() => {
     if (isDisplayMainPlayer && streamS) {
       videoTagS.current.srcObject = streamS
+      // videoTagS.current.srcObject = cam
       videoTagS.current.play()
     }
 
@@ -162,20 +163,14 @@ export const Index = () => {
     // console.log('data', data);
 
     const data = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: {min: 640, ideal: 1280},
-        height: {min: 400, ideal: 720},
-      }
+      video: {width: {exact: 1280}, height: {exact: 720}}
     })
     setCam(data);
     return data
   }
   const getScreen = async () => {
     try {
-      const data = await navigator.mediaDevices.getDisplayMedia({
-        width: {ideal: 1280},
-        height: {ideal: 720}
-      })
+      const data = await navigator.mediaDevices.getDisplayMedia()
       setScreen(data)
       return data
     } catch (e) {
@@ -202,7 +197,13 @@ export const Index = () => {
     if (alreadyStream[type]) return;
     let merg;
     if (!merger) {
-      merg = new VideoStreamMerger()
+      merg = new VideoStreamMerger({
+        width: 1280,   // Width of the output video
+        height: 720,  // Height of the output video
+        // fps: 30,       // Video capture frames per second
+        // clearRect: true, // Clear the canvas every frame
+        // audioContext: null, // Supply an external AudioContext (for audio effects)
+      })
       setMerger(merg)
     } else {
       merg = merger
@@ -232,8 +233,8 @@ export const Index = () => {
       merg.addStream(webcamStream, {
         x: 0,
         y: 0,
-        width: merg.width,
-        height: merg.height,
+        width: 1280,
+        height: 720,
       })
     }
     addStreamToPeer(merg.result)
@@ -273,16 +274,19 @@ export const Index = () => {
     merger.addStream(Screen, {
       x: 0,
       y: 0,
-      width: merger.width,
-      height: merger.height,
+      width: 1280,
+      height: 720,
+      // width: merger.width,
+      // height: merger.height,
+
       mute: true
     })
 
     merger.addStream(Cam, {
-      x: merger.width - 150,
-      y: merger.height - 150,
-      width: 150,
-      height: 150,
+      x: merger.width - 256,
+      y: merger.height - 144,
+      width: 256,
+      height: 144,
       mute: false
     })
     merger.addStream(Audio)
