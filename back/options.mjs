@@ -1,3 +1,3 @@
 export default {
-  api: 'https://xacademy.ua/api/lessons/setStreamVideo'
+  api: 'http://file.makeqr.ru/api/lessons/setStreamVideo'
 }
