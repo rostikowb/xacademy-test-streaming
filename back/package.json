@@ -17,6 +17,7 @@
     "cross-blob": "^3.0.0",
     "express": "^4.17.1",
     "extendable-media-recorder": "^6.4.0",
+    "ffprobe": "^1.1.2",
     "fluent-ffmpeg": "^2.1.2",
     "fluent-ffmpeg-multistream": "^1.0.0",
     "simple-peer": "^9.11.0",

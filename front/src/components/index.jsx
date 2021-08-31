@@ -140,7 +140,7 @@ export const Index = () => {
       console.trace(err);
     })
   }, [ws, peerS])
-
+  console.log(peerS);
   // если появляеться тру streamC то запускаем videoTagC плеер
   useEffect(() => {
     if (streamC) {
@@ -163,7 +163,10 @@ export const Index = () => {
     // console.log('data', data);
 
     const data = await navigator.mediaDevices.getUserMedia({
-      video: {width: {exact: 1280}, height: {exact: 720}}
+      video: {
+        width: {exact: 1280}, height: {exact: 720},
+        frameRate: 30
+      }
     })
     setCam(data);
     return data
@@ -181,7 +184,7 @@ export const Index = () => {
   // запуск соединения и добавлением стрима
   const addStreamToPeer = (stream) => {
     if (!peerC) {
-      ws.sendNewStreamer()
+      ws.sendNewStreamer('idididididisddf')
       peerCStart(stream)
     } else {
       try {
@@ -200,7 +203,7 @@ export const Index = () => {
       merg = new VideoStreamMerger({
         width: 1280,   // Width of the output video
         height: 720,  // Height of the output video
-        // fps: 30,       // Video capture frames per second
+        fps: 30,       // Video capture frames per second
         // clearRect: true, // Clear the canvas every frame
         // audioContext: null, // Supply an external AudioContext (for audio effects)
       })
@@ -294,7 +297,7 @@ export const Index = () => {
 
   // метод старта просмотра стрима(запрос по сокетам на добавления зрителя и установку соединения)
   const handleWatchStream = async () => {
-    ws.sendNewReceiver(chanel)
+    ws.sendNewReceiver('idididididisddf')
     setIsDisplayMainPlayer(true)
   }
 
