@@ -20,6 +20,7 @@
     "ffprobe": "^1.1.2",
     "fluent-ffmpeg": "^2.1.2",
     "fluent-ffmpeg-multistream": "^1.0.0",
+    "multer": "^1.4.2",
     "simple-peer": "^9.11.0",
     "socket.io": "^2.3.1",
     "wrtc": "^0.4.7"

@@ -4,7 +4,23 @@ import {createServer} from 'http';
 import Peer from "simple-peer";
 import wrtc from "wrtc";
 import cors from "cors";
-import {beforeOffer, glueRecord} from "./saveStream.mjs";
+import multer from "multer";
+import path from "path"
+import sendFilePathToApi from "./sendFilePathToApi.mjs";
+
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb)=> {
+    cb(null, 'video')
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname))
+  }
+})
+
+const upload = multer({storage})
+// import {beforeOffer, glueRecord} from "./saveStream.mjs";
+
 
 
 const app = express();
@@ -44,12 +60,20 @@ app.get('/getRooms', (req, res) => {
   return res.status(200).json({list})
 })
 
-app.get('/glueRecord/:id', async (req, res) => {
+app.post('/saveVideo/:id', upload.any(), (req, res) => {
   const id = req?.params?.id;
-  if (!id) return res.status(403).json('id not found')
-  res.status(200).json('ok')
-  glueRecord(id)
+
+  sendFilePathToApi(id, req.files[0].filename)
+  return res.status(200).json({result: 'ok'})
 })
+
+
+// app.get('/glueRecord/:id', async (req, res) => {
+//   const id = req?.params?.id;
+//   if (!id) return res.status(403).json('id not found')
+//   res.status(200).json('ok')
+//   glueRecord(id)
+// })
 
 io.on('connection', (socket) => {
   console.log('connect');
@@ -75,13 +99,13 @@ io.on('connection', (socket) => {
 
 
       try {
-        beforeOffer(stream, data, peer)
+        // beforeOffer(stream, data, peer)
       } catch (e) {
         console.log(e);
       }
 
       Receiver[data].stream = stream;
-      // Receiver.stream = stream;
+
     })
 
     peer.on('connect', () => {
